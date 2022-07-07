@@ -7,7 +7,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin,
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.memcpy import memcpy
-from starkware.cairo.common.math import split_felt
+from starkware.cairo.common.math import split_felt, assert_lt
 from starkware.cairo.common.bool import TRUE
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_info
 from starkware.cairo.common.cairo_secp.signature import verify_eth_signature_uint256
@@ -20,7 +20,7 @@ from openzeppelin.utils.constants import IACCOUNT_ID
 #
 
 @storage_var
-func Account_current_nonce() -> (res : felt):
+func Account_last_nonce() -> (res : felt):
 end
 
 @storage_var
@@ -84,11 +84,16 @@ namespace Account:
         return (res=res)
     end
 
+    # The nonce should be set by the caller to the current timestamp in microseconds,
+    # so this function should not be used.
+    # However, for compatibility issues, we still provide the get_nonce function that
+    # returns a valid nonce.
     func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
         res : felt
     ):
-        let (res) = Account_current_nonce.read()
-        return (res=res)
+        let (res) = Account_last_nonce.read()
+        let minimum_valid_nonce = res + 1
+        return (res=minimum_valid_nonce)
     end
 
     #
@@ -164,6 +169,7 @@ namespace Account:
         pedersen_ptr : HashBuiltin*,
         range_check_ptr,
         bitwise_ptr : BitwiseBuiltin*,
+        ecdsa_ptr : SignatureBuiltin*,
     }(
         call_array_len : felt,
         call_array : AccountCallArray*,
@@ -175,15 +181,12 @@ namespace Account:
 
         let (__fp__, _) = get_fp_and_pc()
         let (tx_info) = get_tx_info()
-        let (local ecdsa_ptr : SignatureBuiltin*) = alloc()
-        with ecdsa_ptr:
-            # validate transaction
-            with_attr error_message("Account: invalid signature"):
-                let (is_valid) = is_valid_signature(
-                    tx_info.transaction_hash, tx_info.signature_len, tx_info.signature
-                )
-                assert is_valid = TRUE
-            end
+        # validate transaction
+        with_attr error_message("Account: invalid signature"):
+            let (is_valid) = is_valid_signature(
+                tx_info.transaction_hash, tx_info.signature_len, tx_info.signature
+            )
+            assert is_valid = TRUE
         end
 
         return _unsafe_execute(call_array_len, call_array, calldata_len, calldata, nonce)
@@ -222,6 +225,7 @@ namespace Account:
         pedersen_ptr : HashBuiltin*,
         range_check_ptr,
         bitwise_ptr : BitwiseBuiltin*,
+        ecdsa_ptr : SignatureBuiltin*,
     }(
         call_array_len : felt,
         call_array : AccountCallArray*,
@@ -238,14 +242,17 @@ namespace Account:
 
         # validate nonce
 
-        let (_current_nonce) = Account_current_nonce.read()
+        let (_last_nonce) = Account_last_nonce.read()
 
         with_attr error_message("Account: nonce is invalid"):
-            assert _current_nonce = nonce
+            # As the nonce is timestamp-based, we only assert that the nonce is
+            # strictly greater than the previous one.
+            # Transaction ordering is not guaranted, but replay attacks are avoided.
+            assert_lt(_last_nonce, nonce)
         end
 
         # bump nonce
-        Account_current_nonce.write(_current_nonce + 1)
+        Account_last_nonce.write(nonce)
 
         # TMP: Convert `AccountCallArray` to 'Call'.
         let (calls : Call*) = alloc()

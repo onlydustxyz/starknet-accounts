@@ -7,6 +7,12 @@ libs_path = "lib"
 ["protostar.shared_command_configs"]
 cairo_path = ["src", "lib/cairo_contracts/src"]
 
+[profile.testnet.protostar.deploy]
+network="alpha-goerli"
+
+[profile.mainnet.protostar.deploy]
+network="alpha-mainnet"
+
 ["protostar.contracts"]
 timestamp_based_account = [
     "src/onlydust/accounts/timestamp_based_account/account.cairo",

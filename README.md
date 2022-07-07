@@ -33,9 +33,24 @@
 protostar build --account-contract
 ```
 
-## 🔬 Usage
+## 🔬 Deploy
+
+First create a signer (public/private key pair).
+To do so, you can follow these steps:
+
+1. deploy an account with Argent X
+2. go on voyager to get the `signer` (ie. public key) of the account by calling `get_signer`
+3. then, deploy the account contract and pass the public key as input:
+
+```sh
+protostar -p testnet deploy ./build/timestamp_based_account.json --inputs <signer-public-key>
+```
 
 ## 🌡️ Testing
+
+Go to <https://faucet.goerli.starknet.io/> to send ETH to the newly deployed account.
+
+TODO: provide a little tool to test the account contract quickly.
 
 ## 🫶 Contributing
 
