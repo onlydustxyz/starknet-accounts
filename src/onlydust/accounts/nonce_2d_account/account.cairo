@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin
 
-from onlydust.accounts.timestamp_based_account.library import Account, AccountCallArray
+from onlydust.accounts.nonce_2d_account.library import Account, AccountCallArray
 
 from openzeppelin.introspection.ERC165 import ERC165
 
@@ -30,9 +30,13 @@ func get_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
+# !! This is not compatible with standard starknet clients !!
+# It gets a nonce_key as argument.
 @view
-func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (res : felt):
-    let (res) = Account.get_nonce()
+func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(nonce_key) -> (
+    res : felt
+):
+    let (res) = Account.get_nonce(nonce_key)
     return (res=res)
 end
 

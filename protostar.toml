@@ -17,3 +17,6 @@ network="alpha-mainnet"
 timestamp_based_account = [
     "src/onlydust/accounts/timestamp_based_account/account.cairo",
 ]
+nonce_2d_account = [
+    "src/onlydust/accounts/nonce_2d_account/account.cairo",
+]

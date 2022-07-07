@@ -46,6 +46,10 @@ To do so, you can follow these steps:
 protostar -p testnet deploy ./build/timestamp_based_account.json --inputs <signer-public-key>
 ```
 
+```sh
+protostar -p testnet deploy ./build/nonce_2d_account.json --inputs <signer-public-key>
+```
+
 ## 🌡️ Testing
 
 Go to <https://faucet.goerli.starknet.io/> to send ETH to the newly deployed account.

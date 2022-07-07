@@ -7,7 +7,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin,
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.memcpy import memcpy
-from starkware.cairo.common.math import split_felt, assert_lt
+from starkware.cairo.common.math import split_felt, assert_lt, unsigned_div_rem
 from starkware.cairo.common.bool import TRUE
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_info
 from starkware.cairo.common.cairo_secp.signature import verify_eth_signature_uint256
@@ -20,7 +20,7 @@ from openzeppelin.utils.constants import IACCOUNT_ID
 #
 
 @storage_var
-func Account_last_nonce() -> (res : felt):
+func Account_2D_nonce(key : felt) -> (res : felt):
 end
 
 @storage_var
@@ -84,16 +84,16 @@ namespace Account:
         return (res=res)
     end
 
-    # The nonce should be set by the caller to the current timestamp in microseconds,
-    # so this function should not be used.
-    # However, for compatibility issues, we still provide the get_nonce function that
-    # returns a valid nonce.
-    func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        res : felt
-    ):
-        let (res) = Account_last_nonce.read()
-        let minimum_valid_nonce = res + 1
-        return (res=minimum_valid_nonce)
+    # !! This is not compatible with standard starknet clients !!
+    func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        nonce_key : felt
+    ) -> (nonce : felt):
+        let (nonce_counter_value) = Account_2D_nonce.read(nonce_key)
+        with_attr error_message("Account: nonce limit reached"):
+            assert_lt(nonce_counter_value, 2 ** 64)
+        end
+        let nonce = nonce_key * 2 ** 64 + nonce_counter_value
+        return (nonce=nonce)
     end
 
     #
@@ -133,37 +133,6 @@ namespace Account:
         return (is_valid=TRUE)
     end
 
-    func is_valid_eth_signature{
-        syscall_ptr : felt*,
-        pedersen_ptr : HashBuiltin*,
-        bitwise_ptr : BitwiseBuiltin*,
-        range_check_ptr,
-    }(hash : felt, signature_len : felt, signature : felt*) -> (is_valid : felt):
-        alloc_locals
-        let (_public_key) = get_public_key()
-        let (__fp__, _) = get_fp_and_pc()
-
-        # This interface expects a signature pointer and length to make
-        # no assumption about signature validation schemes.
-        # But this implementation does, and it expects a the sig_v, sig_r,
-        # sig_s, and hash elements.
-        let sig_v : felt = signature[0]
-        let sig_r : Uint256 = Uint256(low=signature[1], high=signature[2])
-        let sig_s : Uint256 = Uint256(low=signature[3], high=signature[4])
-        let (high, low) = split_felt(hash)
-        let msg_hash : Uint256 = Uint256(low=low, high=high)
-
-        let (local keccak_ptr : felt*) = alloc()
-
-        with keccak_ptr:
-            verify_eth_signature_uint256(
-                msg_hash=msg_hash, r=sig_r, s=sig_s, v=sig_v, eth_address=_public_key
-            )
-        end
-
-        return (is_valid=TRUE)
-    end
-
     func execute{
         syscall_ptr : felt*,
         pedersen_ptr : HashBuiltin*,
@@ -184,34 +153,6 @@ namespace Account:
         # validate transaction
         with_attr error_message("Account: invalid signature"):
             let (is_valid) = is_valid_signature(
-                tx_info.transaction_hash, tx_info.signature_len, tx_info.signature
-            )
-            assert is_valid = TRUE
-        end
-
-        return _unsafe_execute(call_array_len, call_array, calldata_len, calldata, nonce)
-    end
-
-    func eth_execute{
-        syscall_ptr : felt*,
-        pedersen_ptr : HashBuiltin*,
-        range_check_ptr,
-        bitwise_ptr : BitwiseBuiltin*,
-    }(
-        call_array_len : felt,
-        call_array : AccountCallArray*,
-        calldata_len : felt,
-        calldata : felt*,
-        nonce : felt,
-    ) -> (response_len : felt, response : felt*):
-        alloc_locals
-
-        let (__fp__, _) = get_fp_and_pc()
-        let (tx_info) = get_tx_info()
-
-        # validate transaction
-        with_attr error_message("Account: invalid secp256k1 signature"):
-            let (is_valid) = is_valid_eth_signature(
                 tx_info.transaction_hash, tx_info.signature_len, tx_info.signature
             )
             assert is_valid = TRUE
@@ -241,18 +182,16 @@ namespace Account:
         end
 
         # validate nonce
-
-        let (_last_nonce) = Account_last_nonce.read()
+        let (nonce_key, _) = unsigned_div_rem(nonce, 2 ** 64)
+        let (_nonce) = get_nonce(nonce_key)
 
         with_attr error_message("Account: nonce is invalid"):
-            # As the nonce is timestamp-based, we only assert that the nonce is
-            # strictly greater than the previous one.
-            # Transaction ordering is not guaranted, but replay attacks are avoided.
-            assert_lt(_last_nonce, nonce)
+            assert _nonce = nonce
         end
 
         # bump nonce
-        Account_last_nonce.write(nonce)
+        let (nonce_counter_value) = Account_2D_nonce.read(nonce_key)
+        Account_2D_nonce.write(nonce_key, nonce_counter_value + 1)
 
         # TMP: Convert `AccountCallArray` to 'Call'.
         let (calls : Call*) = alloc()
