@@ -26,7 +26,9 @@
 ## 🎟️ Description
 
 ## 🎗️ Prerequisites
+
 Make sure your protostar is up-to-date:
+
 ```sh
 protostar upgrade
 ```
@@ -42,8 +44,8 @@ protostar build
 First, create a signer (public/private key pair).
 To do so, you can follow these steps:
 
-1. deploy an account with Argent X
-2. go on voyager to get the `signer` (ie. public key) of the account by calling `get_signer`
+1. deploy an account with Braavos
+2. extract the account's public key
 3. then, deploy the account contract and pass the public key as input:
 
 ```sh
@@ -55,8 +57,36 @@ protostar -p testnet deploy ./build/nonce_2d_account.json --inputs <signer-publi
 ```
 
 or in local:
+
 ```sh
 protostar -p local deploy ./build/nonce_2d_account.json --inputs <signer-public-key>
+```
+
+### Deploy Marketplace and Signup accounts on devnet
+
+As a convenience, a script is provided to deploy 2d nonce accounts for Marketplace (ie. a Feeder) and Signup (ie. a Registerer) backends.
+It is meant to be used with devnet `--seed 0` provided accounts.
+
+With the `--seed 0` option, a list of 10 accounts are provided by starknet-devnet.
+Those accounts will be used as follow:
+
+```txt
+Account #0 : Not used
+Account #1 : Sign-up backend signer (public/private key pair is used by the 2d nonce account)
+Account #2 : Marketplace backend signer (public/private key pair is used by the 2d nonce account)
+Account #3 : Not used
+Account #4 : Not used
+Account #5 : Not used
+Account #6 : Not used
+Account #7 : Not used
+Account #8 : Not used
+Account #9 : Not used
+Account #10: Not used
+```
+
+```sh
+starknet-devnet --seed 0
+./scripts/deploy-e2e-tests-devnet.sh
 ```
 
 ## 🌡️ Testing
