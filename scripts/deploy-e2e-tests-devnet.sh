@@ -77,11 +77,11 @@ add_funds() {
 
 deploy_accounts_for_e2e_tests() {
     log_info "Deploying signup (ie. registerer) account..."
-    SIGNUP_ACCOUNT_ADDRESS=`send_transaction "protostar --profile local deploy ./build/nonce_2d_account.json --inputs 0x175666e92f540a19eb24fa299ce04c23f3b75cb2d2332e3ff2021bf6d615fa5"` || exit_error
+    SIGNUP_ACCOUNT_ADDRESS=`send_transaction "starknet $NETWORK_OPT deploy --no_wallet --contract ./build/nonce_2d_account.json --inputs 0x175666e92f540a19eb24fa299ce04c23f3b75cb2d2332e3ff2021bf6d615fa5"` || exit_error
     add_funds $SIGNUP_ACCOUNT_ADDRESS || exit_error
 
     log_info "Deploying marketplace (ie. feeder) account..."
-    MARKETPLACE_ACCOUNT_ADDRESS=`send_transaction "protostar --profile local deploy ./build/nonce_2d_account.json --inputs 0x58100ffde2b924de16520921f6bfe13a8bdde9d296a338b9469dd7370ade6cb"` || exit_error
+    MARKETPLACE_ACCOUNT_ADDRESS=`send_transaction "starknet $NETWORK_OPT deploy --no_wallet --contract ./build/nonce_2d_account.json --inputs 0x58100ffde2b924de16520921f6bfe13a8bdde9d296a338b9469dd7370ade6cb"` || exit_error
     add_funds $MARKETPLACE_ACCOUNT_ADDRESS || exit_error
 
     (
